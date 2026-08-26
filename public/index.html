@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>클럽하우스 체스 — 실시간 웹 체스</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">♞</span>
+    <span class="brand-name">Clubhouse<em>Chess</em></span>
+  </div>
+  <div class="topbar-right" id="topbarUser" hidden>
+    <span class="user-chip" id="userChip"></span>
+    <button class="ghost-btn" id="inboxBtn">우편함 <span class="badge" id="inboxBadge" hidden>0</span></button>
+    <button class="ghost-btn" id="logoutBtn">로그아웃</button>
+  </div>
+</header>
+
+<!-- ============ AUTH SCREEN ============ -->
+<section id="authScreen" class="screen">
+  <div class="auth-card">
+    <h1 class="display">체스 클럽에 입장하기</h1>
+    <p class="sub">DB 없이 서버 메모리에 저장되는 계정입니다. 서버가 재시작되면 초기화됩니다.</p>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="login">로그인</button>
+      <button class="tab-btn" data-tab="register">회원가입</button>
+    </div>
+    <form id="loginForm" class="auth-form">
+      <label>아이디<input type="text" id="loginUsername" autocomplete="username" required /></label>
+      <label>비밀번호<input type="password" id="loginPassword" autocomplete="current-password" required value="123456" /></label>
+      <button type="submit" class="primary-btn">로그인</button>
+      <p class="hint">테스트 계정 비밀번호 기본값: 123456</p>
+    </form>
+    <form id="registerForm" class="auth-form" hidden>
+      <label>아이디<input type="text" id="regUsername" required /></label>
+      <label>비밀번호<input type="password" id="regPassword" required value="123456" /></label>
+      <button type="submit" class="primary-btn">가입 후 입장</button>
+    </form>
+    <p class="auth-error" id="authError"></p>
+  </div>
+</section>
+
+<!-- ============ LOBBY SCREEN ============ -->
+<section id="lobbyScreen" class="screen" hidden>
+  <div id="myGamesPanel" class="panel my-games-panel" hidden>
+    <h2 class="display">내 미완료 대국</h2>
+    <div id="myGamesList" class="room-list"></div>
+  </div>
+  <div class="lobby-grid">
+    <div class="panel lobby-main">
+      <div class="panel-head">
+        <h2 class="display">로비 — 진행 중인 대국</h2>
+        <button class="primary-btn" id="createRoomBtn">+ 새 대국 만들기</button>
+      </div>
+      <div id="roomList" class="room-list"></div>
+    </div>
+
+    <aside class="panel lobby-side">
+      <h3 class="display small">내 전적</h3>
+      <div id="statsBox" class="stats-box"></div>
+
+      <h3 class="display small">접속 중인 플레이어</h3>
+      <div id="onlineList" class="online-list"></div>
+    </aside>
+  </div>
+
+  <!-- 방 생성 모달 -->
+  <div id="createRoomModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <h3 class="display small">새 대국 만들기</h3>
+      <label>모드
+        <select id="modeSelect">
+          <option value="1v1">1 vs 1 — 클래식 (8x8)</option>
+          <option value="2v2">2 vs 2 — 팀 체스 (16x8)</option>
+          <option value="4p">4인 자유대전 — 십자형 보드</option>
+        </select>
+      </label>
+      <label>시간 제어
+        <select id="timeSelect">
+          <option value="unlimited">무제한</option>
+          <option value="bullet">1분 (총알)</option>
+          <option value="blitz5">5분</option>
+          <option value="rapid10">10분</option>
+          <option value="classical15">15분 + 3초 피셔</option>
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button class="ghost-btn" id="cancelCreateBtn">취소</button>
+        <button class="primary-btn" id="confirmCreateBtn">만들기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 우편함 모달 -->
+  <div id="inboxModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <h3 class="display small">우편함</h3>
+      <div id="inboxList" class="inbox-list"></div>
+      <div class="modal-actions"><button class="ghost-btn" id="closeInboxBtn">닫기</button></div>
+    </div>
+  </div>
+
+  <!-- 초대 모달 -->
+  <div id="inviteModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <h3 class="display small"><span id="inviteTargetName"></span>님을 초대할 방 선택</h3>
+      <div id="inviteRoomChoices" class="room-list"></div>
+      <div class="modal-actions"><button class="ghost-btn" id="closeInviteBtn">닫기</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GAME SCREEN ============ -->
+<section id="gameScreen" class="screen" hidden>
+  <div class="game-layout">
+    <div class="game-center">
+      <div class="player-strip" id="topPlayerStrip"></div>
+      <div class="board-wrap">
+        <div id="board" class="board"></div>
+      </div>
+      <div class="player-strip" id="bottomPlayerStrip"></div>
+      <div class="game-controls">
+        <button class="ghost-btn" id="resignBtn">기권</button>
+        <button class="ghost-btn" id="offerDrawBtn">무승부 제안</button>
+        <button class="ghost-btn" id="takebackBtn">무르기 요청</button>
+        <button class="ghost-btn" id="leaveGameBtn">로비로</button>
+      </div>
+      <div id="notice" class="notice" hidden></div>
+    </div>
+
+    <aside class="game-side">
+      <div class="panel tabbed-panel">
+        <div class="tabs" id="sideTabs">
+          <button class="tab-btn active" data-sidetab="moves">기보</button>
+          <button class="tab-btn" data-sidetab="chat">채팅</button>
+          <button class="tab-btn" id="teamChatTabBtn" data-sidetab="teamchat" hidden>팀 채팅</button>
+        </div>
+        <div id="movesPane" class="side-pane">
+          <div id="captureBar" class="capture-bar"></div>
+          <ol id="moveList" class="move-list"></ol>
+          <div id="replayControls" class="replay-controls" hidden>
+            <button id="replayFirst">⏮</button>
+            <button id="replayPrev">◀</button>
+            <span id="replayIndex">0 / 0</span>
+            <button id="replayNext">▶</button>
+            <button id="replayLast">⏭</button>
+          </div>
+        </div>
+        <div id="chatPane" class="side-pane" hidden>
+          <div id="chatLog" class="chat-log"></div>
+          <form id="chatForm" class="chat-form">
+            <input id="chatInput" placeholder="메시지 입력..." autocomplete="off" />
+            <button type="submit">전송</button>
+          </form>
+        </div>
+        <div id="teamChatPane" class="side-pane" hidden>
+          <div id="teamChatLog" class="chat-log"></div>
+          <form id="teamChatForm" class="chat-form">
+            <input id="teamChatInput" placeholder="팀원에게만 보이는 메시지..." autocomplete="off" />
+            <button type="submit">전송</button>
+          </form>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<div id="promotionModal" class="modal-backdrop" hidden>
+  <div class="modal promo-modal">
+    <h3 class="display small">승급할 기물 선택</h3>
+    <div class="promo-choices" id="promoChoices"></div>
+  </div>
+</div>
+
+<div id="gameOverModal" class="modal-backdrop" hidden>
+  <div class="modal">
+    <h3 class="display small" id="gameOverTitle"></h3>
+    <p id="gameOverReason"></p>
+    <div class="modal-actions">
+      <button class="ghost-btn" id="reviewBtn">복기하기</button>
+      <button class="primary-btn" id="backToLobbyBtn">로비로 돌아가기</button>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/chessEngine.js"></script>
+<script src="/client.js"></script>
+</body>
+</html>
